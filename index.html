@@ -1,1 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kripto Kart (Kendi Proxy’in)</title>
+  <style>
+    :root{--bg:#121212;--card:#1e1e1e;--accent:#00d4ff;--text:#e0e0e0;--mute:#888}
+    *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+    body{background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 20px}
+    h1{margin-bottom:30px;font-size:2rem;text-align:center}
+    .picker{display:flex;gap:12px;margin-bottom:30px;flex-wrap:wrap;justify-content:center}
+    select,button{padding:10px 16px;font-size:1rem;border:none;border-radius:6px;outline:none}
+    select{background:var(--card);color:var(--text);width:260px}
+    button{background:var(--accent);color:#000;font-weight:600;cursor:pointer;transition:.2s}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    button:hover:not(:disabled){filter:brightness(1.1)}
+    #news{width:100%;max-width:720px;display:flex;flex-direction:column;gap:18px}
+    .card{background:var(--card);border-left:4px solid var(--accent);padding:18px;border-radius:6px}
+    .card h2{font-size:1.25rem;margin-bottom:6px}
+    .card p{line-height:1.5}
+    .loading{color:var(--accent);margin-top:20px;text-align:center}
+    .error{color:#ff5252;text-align:center;margin-top:20px}
+  </style>
+</head>
+<body>
 
+  <h1>Kripto Haber Kartları</h1>
+
+  <div class="picker">
+    <select id="sourceSel"></select>
+    <button id="getBtn">Haberi Getir</button>
+  </div>
+
+  <div id="news"></div>
+
+  <script>
+  /* ---------- 1) Kendi GitHub Pages proxy’in ---------- */
+  const PROXY = 'https://YOUR_GITHUB_USERNAME.github.io/rss-cors/?url=';   // ← GitHub kullanıcı adını yaz
+
+  /* ---------- 2) RSS listesi ---------- */
+  const sources=[
+    {name:"CoinDesk",rss:"https://www.coindesk.com/arc/outboundfeeds/rss/"},
+    {name:"Cointelegraph",rss:"https://cointelegraph.com/rss"},
+    {name:"Decrypt",rss:"https://decrypt.co/feed"},
+    {name:"BitcoinMagazine",rss:"https://bitcoinmagazine.com/feed"},
+    {name:"Blockworks",rss:"https://blockworks.co/feed"},
+    {name:"The Block",rss:"https://www.theblock.co/rss"}
+  ];
+
+  /* ---------- 3) Menü ---------- */
+  const sel=document.getElementById("sourceSel");
+  sources.forEach(s=>{const o=document.createElement("option");o.value=s.rss;o.textContent=s.name;sel.appendChild(o)});
+
+  /* ---------- 4) Çeviri (jsonp) ---------- */
+  function translateTR(text,cb){
+    if(!text.trim())return cb(text);
+    const c="cb"+Date.now()+Math.floor(Math.random()*1000);
+    window[c]=function(r){
+      try{cb(r.sentences.map(s=>s.trans).join(""))}catch{cb(text)}
+      delete window[c];
+    };
+    const s=document.createElement("script");
+    s.src="https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=tr&dt=t&q="+encodeURIComponent(text)+"&callback="+c;
+    document.head.appendChild(s);s.remove();
+  }
+
+  /* ---------- 5) RSS çekme (fetch) ---------- */
+  async function fetchRSS(url){
+    const res=await fetch(PROXY+encodeURIComponent(url));
+    if(!res.ok) throw new Error("Proxy hatası");
+    const txt=await res.text();
+    const dom=new DOMParser().parseFromString(txt,"application/xml");
+    const items=dom.querySelectorAll("item");
+    return Array.from(items).map(it=>{
+      const title=it.querySelector("title")?.textContent||"";
+      const link=it.querySelector("link")?.textContent||"#";
+      const desc=it.querySelector("description")?.textContent||"";
+      const pub=it.querySelector("pubDate")?.textContent||"";
+      return{title,link,desc,pub};
+    });
+  }
+
+  /* ---------- 6) UI ---------- */
+  const news=document.getElementById("news");
+  const btn=document.getElementById("getBtn");
+
+  btn.onclick=async()=>{
+    btn.disabled=true;
+    news.innerHTML='<div class="loading">RSS çekiliyor…</div>';
+    try{
+      const list=await fetchRSS(sel.value);
+      if(!list.length) throw new Error("Boş RSS");
+      news.innerHTML="";
+      list.slice(0,10).forEach(it=>{
+        const div=document.createElement("div");div.className="card";
+        div.innerHTML=`<h2>Çevriliyor…</h2><p>Çevriliyor…</p>`;
+        news.appendChild(div);
+        translateTR(it.title,t=>div.querySelector("h2").textContent=t);
+        translateTR(it.desc.replace(/<[^>]+>/g,"").slice(0,200),t=>div.querySelector("p").textContent=t+"…");
+      });
+    }catch(e){
+      news.innerHTML='<div class="error">RSS alınamadı. Proxy adresini kontrol et.</div>';
+    }finally{btn.disabled=false;}
+  };
+  </script>
+
+</body>
+</html>
