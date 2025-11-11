@@ -104,6 +104,21 @@
     }finally{btn.disabled=false;}
   };
   </script>
-
+<script>
+/* Basit CORS açan proxy */
+const url = new URLSearchParams(location.search).get('url');
+if (!url) {
+  document.status = 400;
+  document.body = "URL eksik";
+} else {
+  fetch(url)
+    .then(r => r.text())
+    .then(t => {
+        document.body=t;
+        /* CORS başlıklarını ekleyemiyoruz ama GH Pages zaten */
+    })
+    .catch(e=>document.body="Hata: "+e);
+}
+</script>
 </body>
 </html>
